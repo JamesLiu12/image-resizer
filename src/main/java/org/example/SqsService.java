@@ -4,6 +4,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,13 +16,11 @@ public class SqsService {
         this.sqsClient = SqsClient.builder().region(Region.AP_NORTHEAST_1).build();
     }
 
-    public String sendMessageWithId(String queueUrl, String messageId, String message) throws Exception {
-        Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
-        messageAttributes.put("id",
-                MessageAttributeValue.builder()
-                        .dataType("String")
-                        .stringValue(messageId)
-                        .build());
+    public String sendMessage(String queueUrl, String message,
+                              Map<String, MessageAttributeValue> messageAttributes) throws Exception {
+        if (messageAttributes == null) {
+            messageAttributes = new HashMap<>();
+        }
 
         SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
                 .queueUrl(queueUrl)
@@ -34,28 +33,58 @@ public class SqsService {
         return response.messageId();
     }
 
-    public String receiveMessageWithId(String queueUrl, String messageId) throws Exception {
+    public Message receiveMessage(String queueUrl,
+                                 Map<String, MessageAttributeValue> expectedAttributes,
+                                 int maxMessageNumber) throws Exception {
+
+        List<String> attributeNames = expectedAttributes == null ? new ArrayList<>()
+                : new ArrayList<>(expectedAttributes.keySet());
+
         while (true) {
-            ReceiveMessageRequest receiveRequest = ReceiveMessageRequest.builder()
-                    .queueUrl(queueUrl)
-                    .messageAttributeNames("id")
-                    .maxNumberOfMessages(10)
-                    .build();
+            ReceiveMessageRequest receiveRequest = expectedAttributes == null ?
+                    ReceiveMessageRequest.builder()
+                            .queueUrl(queueUrl)
+                            .messageAttributeNames("All")
+                            .maxNumberOfMessages(maxMessageNumber)
+                            .build()
+                    :
+                    ReceiveMessageRequest.builder()
+                            .queueUrl(queueUrl)
+                            .messageAttributeNames(attributeNames)
+                            .maxNumberOfMessages(maxMessageNumber)
+                            .build();
 
             List<Message> messages = sqsClient.receiveMessage(receiveRequest).messages();
 
             for (Message message : messages) {
-                String receivedId = message.messageAttributes().get("id").stringValue();
-                if (receivedId.equals(messageId)) {
+                Map<String, MessageAttributeValue> receivedAttributes = message.messageAttributes();
+
+                boolean allMatch = expectedAttributes == null || expectedAttributes.entrySet().stream()
+                        .allMatch(entry -> {
+                            MessageAttributeValue receivedValue = receivedAttributes.get(entry.getKey());
+                            return receivedValue != null &&
+                                    receivedValue.stringValue().equals(entry.getValue().stringValue());
+                        });
+
+                if (allMatch) {
                     sqsClient.deleteMessage(DeleteMessageRequest.builder()
                             .queueUrl(queueUrl)
                             .receiptHandle(message.receiptHandle())
                             .build());
-                    return message.body();
+                    return message;
                 }
             }
 
             Thread.sleep(2000);
         }
+    }
+
+    public Message receiveMessage(String queueUrl,
+                                 Map<String, MessageAttributeValue> expectedAttributes) throws Exception {
+        return receiveMessage(queueUrl, expectedAttributes, 10);
+    }
+
+    public Message receiveOneMessage(String queueUrl) throws Exception {
+        return receiveMessage(queueUrl, null, 1);
     }
 }

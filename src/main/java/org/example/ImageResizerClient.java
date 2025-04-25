@@ -1,5 +1,10 @@
 package org.example;
 
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class ImageResizerClient {
@@ -14,14 +19,42 @@ public class ImageResizerClient {
         sqsService = new SqsService();
     }
 
-    public void ResizeImage(String filePath, String destinationPath) {
+    public void processImage(String filePath, String destinationPath, int scalePercentage) {
         String imageId = UUID.randomUUID().toString();
-        String originalKey = "original/" + imageId;
+        String fileName = (new File(filePath).getName());
+        String originalKey = "original/" + imageId + "_" + fileName;
 
         try {
             s3DocumentService.uploadFile(bucketName, originalKey, filePath);
-            sqsService.sendMessageWithId(inboxQueueUrl, imageId, originalKey);
-            String resizedKey = sqsService.receiveMessageWithId(outboxQueueUrl, imageId);
+
+            Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
+            messageAttributes.put("id",
+                    MessageAttributeValue.builder()
+                            .dataType("String")
+                            .stringValue(imageId)
+                            .build());
+            messageAttributes.put("scale",
+                    MessageAttributeValue.builder()
+                            .dataType("Number")
+                            .stringValue(String.valueOf(scalePercentage))
+                            .build());
+            messageAttributes.put("fileName",
+                    MessageAttributeValue.builder()
+                            .dataType("String")
+                            .stringValue(fileName)
+                            .build());
+
+            sqsService.sendMessage(inboxQueueUrl, originalKey, messageAttributes);
+
+            Map <String, MessageAttributeValue> expectedAttributes = new HashMap<>();
+            expectedAttributes.put("id",
+                    MessageAttributeValue.builder()
+                            .dataType("String")
+                            .stringValue(imageId)
+                            .build());
+
+            String resizedKey = sqsService.receiveMessage(outboxQueueUrl, expectedAttributes).body();
+
             s3DocumentService.downloadFile(bucketName, resizedKey, destinationPath);
         } catch (Exception e) {
             System.err.println("Error resizing image: " + e.getMessage());
@@ -29,14 +62,57 @@ public class ImageResizerClient {
     }
 
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Usage : java ImageResizerClient <filePath>");
-            return;
+        String inputFile = null;
+        int scalePercentage = -1;
+        String outputFile = null;
+
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "-i":
+                case "--input-file":
+                    if (i + 1 < args.length) inputFile = args[++i];
+                    break;
+                case "-s":
+                case "--scale":
+                    if (i + 1 < args.length) {
+                        try {
+                            scalePercentage = Integer.parseInt(args[++i]);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Error: Scale percentage must be a number");
+                            printUsageAndExit();
+                        }
+                    }
+                    break;
+                case "-o":
+                case "--output-file":
+                    if (i + 1 < args.length) outputFile = args[++i];
+                    break;
+                default:
+                    System.err.println("Error: Unknown option '" + args[i] + "'");
+                    printUsageAndExit();
+            }
         }
-        String filePath = args[0];
+
+        if (inputFile == null || scalePercentage == -1) {
+            printUsageAndExit();
+        }
+
+        if (outputFile == null) {
+            String filename = inputFile.substring(inputFile.lastIndexOf('/') + 1);
+            outputFile = "resized/" + filename;
+        }
+
         ImageResizerClient imageResizerClient = new ImageResizerClient();
-        String destinationPath = "resized/" + filePath.substring(filePath.lastIndexOf("/") + 1);
-        imageResizerClient.ResizeImage(filePath, destinationPath);
+        imageResizerClient.processImage(inputFile, outputFile, scalePercentage);
+    }
+
+    private static void printUsageAndExit() {
+        System.err.println("Usage: ImageResizerClient [options]");
+        System.err.println("Options:");
+        System.err.println("  -i, --input-file FILE       Input image file to resize");
+        System.err.println("  -s, --scale PERCENTAGE      Scale percentage (0-100)");
+        System.err.println("  [-o, --output-file FILE]    Output file (default: based on input filename)");
+        System.exit(1);
     }
 
 }

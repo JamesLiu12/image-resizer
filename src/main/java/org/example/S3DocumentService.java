@@ -37,7 +37,10 @@ public class S3DocumentService {
 
         Files.createDirectories(localPath.getParent());
 
-        s3Client.getObject(getObjectRequest, localPath);
+//        s3Client.getObject(getObjectRequest, localPath);
+        var inputStream = s3Client.getObject(getObjectRequest);
+        var outputStream = Files.newOutputStream(localPath);
+        inputStream.transferTo(outputStream);
 
         System.out.println("File downloaded successfully from S3: " + bucketName + "/" + key +
                 " to " + destinationPath);
