@@ -122,7 +122,7 @@ public class ImageResizerClient {
         System.err.println("Options:");
         System.err.println("  -i, --input-file FILE       Input image file to resize");
         System.err.println("  -s, --scale PERCENTAGE      Scale percentage (0-100)");
-        System.err.println("  [-o, --output-file FILE]    Output file (default: based on input filename)");
+        System.err.println("  [-o, --output-file FILE]    Output file (default: resized/input_file_name)");
         System.exit(1);
     }
 
