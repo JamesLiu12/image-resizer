@@ -49,4 +49,8 @@ public class S3DocumentService {
         s3Client.deleteObject(b -> b.bucket(bucketName).key(key));
         System.out.println("File deleted successfully from S3: " + bucketName + "/" + key);
     }
+
+    public void close() {
+        s3Client.close();
+    }
 }

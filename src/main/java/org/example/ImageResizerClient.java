@@ -64,6 +64,11 @@ public class ImageResizerClient {
         }
     }
 
+    public void close() {
+        s3DocumentService.close();
+        sqsService.close();
+    }
+
     public static void main(String[] args) {
         String inputFile = null;
         int scalePercentage = -1;
@@ -109,6 +114,7 @@ public class ImageResizerClient {
 
         ImageResizerClient imageResizerClient = new ImageResizerClient();
         imageResizerClient.processImage(inputFile, outputFile, scalePercentage);
+        imageResizerClient.close();
     }
 
     private static void printUsageAndExit() {

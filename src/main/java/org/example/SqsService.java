@@ -87,4 +87,8 @@ public class SqsService {
     public Message receiveOneMessage(String queueUrl) throws Exception {
         return receiveMessage(queueUrl, null, 1);
     }
+
+    public void close() {
+        sqsClient.close();
+    }
 }
