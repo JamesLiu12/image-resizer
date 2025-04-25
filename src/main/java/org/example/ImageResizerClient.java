@@ -56,6 +56,9 @@ public class ImageResizerClient {
             String resizedKey = sqsService.receiveMessage(outboxQueueUrl, expectedAttributes).body();
 
             s3DocumentService.downloadFile(bucketName, resizedKey, destinationPath);
+            s3DocumentService.deleteFile(bucketName, resizedKey);
+
+            System.out.println("Image resized and downloaded successfully: " + destinationPath);
         } catch (Exception e) {
             System.err.println("Error resizing image: " + e.getMessage());
         }
@@ -95,10 +98,12 @@ public class ImageResizerClient {
 
         if (inputFile == null || scalePercentage == -1) {
             printUsageAndExit();
+            return;
         }
 
         if (outputFile == null) {
-            String filename = inputFile.substring(inputFile.lastIndexOf('/') + 1);
+            int lastSlashIndex = inputFile.lastIndexOf(File.separator);
+            String filename = lastSlashIndex == -1 ? inputFile : inputFile.substring(lastSlashIndex + 1);
             outputFile = "resized/" + filename;
         }
 

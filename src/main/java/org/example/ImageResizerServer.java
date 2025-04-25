@@ -34,6 +34,7 @@ public class ImageResizerServer {
             Path outputPath = Files.createTempFile("output-", fileName.substring(fileName.lastIndexOf('.')));
 
             s3DocumentService.downloadFile(bucketName, originalKey, inputPath.toString());
+            s3DocumentService.deleteFile(bucketName, originalKey);
 
             resizeImage(inputPath.toString(), outputPath.toString(), scalePercentage);
 

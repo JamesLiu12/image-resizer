@@ -37,12 +37,16 @@ public class S3DocumentService {
 
         Files.createDirectories(localPath.getParent());
 
-//        s3Client.getObject(getObjectRequest, localPath);
         var inputStream = s3Client.getObject(getObjectRequest);
         var outputStream = Files.newOutputStream(localPath);
         inputStream.transferTo(outputStream);
 
         System.out.println("File downloaded successfully from S3: " + bucketName + "/" + key +
                 " to " + destinationPath);
+    }
+
+    public void deleteFile(String bucketName, String key) throws Exception {
+        s3Client.deleteObject(b -> b.bucket(bucketName).key(key));
+        System.out.println("File deleted successfully from S3: " + bucketName + "/" + key);
     }
 }
